@@ -1,16 +1,3 @@
-//===- Hello.cpp - Example code from "Writing an LLVM Pass" ---------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements two versions of the LLVM "Hello World" pass described
-// in docs/WritingAnLLVMPass.html
-//
-//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "hello"
 #include "llvm/ADT/Statistic.h"
@@ -60,6 +47,21 @@ namespace {
     }
     bool isTriviallyLive(Instruction* I) {
       return I->mayHaveSideEffects() || isa<ReturnInst>(I) || isa<TerminatorInst>(I);
+    }
+    void removeDeadBBs(Function &F) {
+      vector<BasicBlock*> DeadBBs;
+      for (Function::iterator f_it = F.begin(), f_ite = F.end(); f_it != f_ite; ++f_it) {
+        BasicBlock* BB = f_it;
+        if(BB->getTerminator () == NULL) {
+          DeadBBs.push_back(BB);
+        }
+      }
+      for(int i = 0; i < DeadBBs.size(); i++) {
+        DeadBBs[i]->dropAllReferences();
+      }
+      for(int i = 0; i < DeadBBs.size(); i++) {
+        DeadBBs[i]->eraseFromParent();
+      }
     }
 
     bool runOnFunction(Function &F) {
@@ -124,6 +126,7 @@ namespace {
       removed += Dead.size();
       errs() << "Total Instructions : " << count << "\n";
       errs() << "Number Removed : " << removed << "\n";
+      removeDeadBBs(F);
       return true;
     }
     // We don't modify the program, so we preserve all analyses.
@@ -137,4 +140,30 @@ namespace {
 
 char ADCE::ID = 0;
 static RegisterPass<ADCE>
-Z("ADCE", "Hello World Pass (with getAnalysisUsage implemented)");
+Z("ADCE", "ADCE implementation");
+
+namespace {
+  struct PrintAll : public FunctionPass {
+    static char ID;
+    PrintAll() : FunctionPass(ID) {}
+
+    bool runOnFunction(Function &F) {
+      errs() << "\n \n \n";
+      int count = 1;
+      for (Function::iterator f_it = F.begin(), f_ite = F.end(); f_it != f_ite; ++f_it) {
+        for(BasicBlock::iterator b_it = f_it->begin(), b_ite = f_it->end(); b_it != b_ite; ++b_it) {
+          Instruction* Ins = b_it;
+          errs() << count << " ";
+          Ins->print(errs());
+          errs() << "\n";
+          count++;
+        }
+      }
+      return false;
+    }
+  };
+}
+
+char PrintAll::ID = 0;
+static RegisterPass<PrintAll>
+W("PrintAll", "Hello World Pass (with getAnalysisUsage implemented)");
